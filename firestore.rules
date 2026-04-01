@@ -1,0 +1,163 @@
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// Collection: /users/{userId}
+// Document ID: userId (string)
+// Fields:
+//   - uid: string (required)
+//   - email: string (required, email format)
+//   - displayName: string (optional)
+//   - photoURL: string (optional)
+//   - role: string (required, enum: ['user', 'admin'])
+//   - plan: string (required, enum: ['free', 'starter', 'pro', 'elite'])
+//   - subscriptionExpiresAt: timestamp (optional)
+//   - dailyScansCount: number (required, >= 0)
+//   - lastScanDate: string (required, YYYY-MM-DD)
+//   - createdAt: timestamp (required)
+//
+// Collection: /users/{userId}/recipes/{recipeId}
+// Document ID: recipeId (string)
+// Fields:
+//   - id: string (required)
+//   - userId: string (required)
+//   - title: string (required, max 100 chars)
+//   - ingredients: list (required, max 50 items)
+//   - instructions: string (required, max 5000 chars)
+//   - nutrients: map (optional)
+//   - time: string (optional)
+//   - difficulty: string (optional)
+//   - isFavorite: bool (required)
+//   - createdAt: timestamp (required)
+//
+// Collection: /users/{userId}/inventory/current
+// Document ID: 'current'
+// Fields:
+//   - userId: string (required)
+//   - items: list (required, max 100 items)
+//   - updatedAt: timestamp (required)
+//
+// Collection: /config/global
+// Document ID: 'global'
+// Fields:
+//   - pricing: map (required)
+//   - aiPrompts: map (required)
+//   - featureToggles: map (required)
+//
+// ===============================================================
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         (request.auth.token.email == "vevoadjimi8@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function areImmutableFieldsUnchanged(fields) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidDateString(dateStr) {
+      return dateStr is string && dateStr.matches("^\\d{4}-\\d{2}-\\d{2}$");
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return hasRequiredFields(['uid', 'email', 'role', 'plan', 'dailyScansCount', 'lastScanDate', 'createdAt']) &&
+             data.uid == request.auth.uid &&
+             isValidEmail(data.email) &&
+             data.role in ['user', 'admin'] &&
+             data.plan in ['free', 'starter', 'pro', 'elite'] &&
+             data.dailyScansCount is number && data.dailyScansCount >= 0 &&
+             isValidDateString(data.lastScanDate) &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidRecipe(data) {
+      return hasRequiredFields(['id', 'userId', 'title', 'ingredients', 'instructions', 'isFavorite', 'createdAt']) &&
+             data.userId == request.auth.uid &&
+             data.title is string && data.title.size() <= 100 &&
+             data.ingredients is list && data.ingredients.size() <= 50 &&
+             data.instructions is string && data.instructions.size() <= 5000 &&
+             data.isFavorite is bool &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidInventory(data) {
+      return hasRequiredFields(['userId', 'items', 'updatedAt']) &&
+             data.userId == request.auth.uid &&
+             data.items is list && data.items.size() <= 100 &&
+             data.updatedAt is timestamp;
+    }
+
+    // ===============================================================
+    // Match Rules
+    // ===============================================================
+
+    // User Profile
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      
+      allow create: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data) &&
+                      (request.resource.data.role == 'user' || isAdmin());
+      
+      allow update: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data) &&
+                      (request.resource.data.role == resource.data.role || isAdmin()) &&
+                      (request.resource.data.plan == resource.data.plan || isAdmin()) &&
+                      areImmutableFieldsUnchanged(['uid', 'email', 'createdAt']);
+      
+      allow delete: if isAdmin();
+    }
+
+    // User Recipes
+    match /users/{userId}/recipes/{recipeId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && isValidRecipe(request.resource.data);
+      allow update: if isOwner(userId) && isValidRecipe(request.resource.data) &&
+                      areImmutableFieldsUnchanged(['id', 'userId', 'createdAt']);
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+
+    // User Inventory
+    match /users/{userId}/inventory/{docId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if isOwner(userId) && isValidInventory(request.resource.data);
+    }
+
+    // Global Config
+    match /config/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+  }
+}

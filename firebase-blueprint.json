@@ -1,0 +1,79 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Stores user information, subscription status, and daily usage tracking.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "admin"] },
+        "plan": { "type": "string", "enum": ["free", "starter", "pro", "elite"] },
+        "subscriptionExpiresAt": { "type": "string", "format": "date-time" },
+        "dailyScansCount": { "type": "integer" },
+        "lastScanDate": { "type": "string", "format": "date" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "plan"]
+    },
+    "Recipe": {
+      "title": "Generated Recipe",
+      "description": "Stores AI-generated recipes for users.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "ingredients": { "type": "array", "items": { "type": "string" } },
+        "instructions": { "type": "string" },
+        "nutrients": { "type": "object" },
+        "time": { "type": "string" },
+        "difficulty": { "type": "string" },
+        "isFavorite": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "ingredients", "instructions"]
+    },
+    "Inventory": {
+      "title": "Fridge Inventory",
+      "description": "Stores the current state of a user's fridge ingredients.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "items": { "type": "array", "items": { "type": "object" } },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "items"]
+    },
+    "AppConfig": {
+      "title": "Global Application Configuration",
+      "description": "Admin-controlled settings for pricing, AI limits, and feature toggles.",
+      "type": "object",
+      "properties": {
+        "pricing": { "type": "object" },
+        "aiPrompts": { "type": "object" },
+        "featureToggles": { "type": "object" }
+      }
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile and subscription data."
+    },
+    "/users/{userId}/recipes/{recipeId}": {
+      "schema": "Recipe",
+      "description": "User's saved or generated recipes."
+    },
+    "/users/{userId}/inventory/current": {
+      "schema": "Inventory",
+      "description": "User's current fridge inventory."
+    },
+    "/config/global": {
+      "schema": "AppConfig",
+      "description": "Global app settings."
+    }
+  }
+}

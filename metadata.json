@@ -1,0 +1,5 @@
+{
+  "name": "FridgeChef AI",
+  "description": "Scan your fridge, detect ingredients, and generate world-class recipes with AI. Subscription-based usage with premium features.",
+  "requestFramePermissions": ["camera", "microphone"]
+}
