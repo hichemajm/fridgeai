@@ -109,7 +109,7 @@ export default function App() {
             <Route path="/favorites" element={<AuthGuard><Favorites /></AuthGuard>} />
             <Route path="/subscription" element={<AuthGuard><Subscription /></AuthGuard>} />
             <Route path="/profile" element={<Profile />} />
-            <Route path="/admin" element={user?.role === 'admin' ? <Admin /> : <Navigate to="/" />} />
+            <Route path="/admin" element={<Admin />} />
           </Route>
         </Routes>
       </BrowserRouter>
