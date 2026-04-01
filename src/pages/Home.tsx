@@ -47,33 +47,54 @@ export default function Home() {
   };
 
   const captureImage = async () => {
-    if (!videoRef.current || !canvasRef.current || !user) return;
+  if (!videoRef.current || !canvasRef.current || !user) return;
 
+  const video = videoRef.current;
+  const canvas = canvasRef.current;
+
+  // 🔥 أهم سطر (حل مشاكل الهاتف)
+  const width = video.videoWidth || 640;
+  const height = video.videoHeight || 480;
+
+  canvas.width = width;
+  canvas.height = height;
+
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
+  ctx.drawImage(video, 0, 0, width, height);
+
+  const imageData = canvas.toDataURL('image/jpeg');
+
+  // ❌ إذا الصورة فارغة
+  if (!imageData || imageData.length < 100) {
+    setError("Camera failed. Try again.");
+    return;
+  }
+
+  const base64 = imageData.split(',')[1];
+
+  try {
     setIsScanning(true);
-    const canvas = canvasRef.current;
-    const video = videoRef.current;
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext('2d');
-    ctx?.drawImage(video, 0, 0);
 
-    const base64Image = canvas.toDataURL('image/jpeg').split(',')[1];
-    
-    try {
-      const ingredients = await detectIngredients(base64Image);
-      
-      // Increment scan count
-      await updateDoc(doc(db, 'users', user.uid), {
-        dailyScansCount: increment(1)
-      });
+    const ingredients = await detectIngredients(base64);
 
-      stopCamera();
-      navigate('/scan-result', { state: { ingredients, image: canvas.toDataURL('image/jpeg') } });
-    } catch (err) {
-      setError("Failed to analyze image. Please try again.");
-      setIsScanning(false);
-    }
-  };
+    await updateDoc(doc(db, 'users', user.uid), {
+      dailyScansCount: increment(1)
+    });
+
+    stopCamera();
+
+    navigate('/scan-result', {
+      state: { ingredients, image: imageData }
+    });
+
+  } catch (err) {
+    console.error(err);
+    setError("AI failed. Try again.");
+    setIsScanning(false);
+  }
+};
 
   useEffect(() => {
     return () => stopCamera();
